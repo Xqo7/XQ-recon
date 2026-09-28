@@ -1,5 +1,8 @@
 import argparse
+import json
+import os
 import socket
+
 import requests
 
 
@@ -14,11 +17,8 @@ SECURITY_HEADERS = [
 
 def dns_lookup(domain):
     try:
-        ip = socket.gethostbyname(domain)
-        print(f"[+] IP Address: {ip}")
-        return ip
+        return socket.gethostbyname(domain)
     except socket.gaierror:
-        print("[-] Could not resolve domain.")
         return None
 
 
@@ -26,30 +26,91 @@ def http_check(domain):
     url = f"https://{domain}"
 
     try:
-        response = requests.get(url, timeout=5)
-
-        print(f"[+] URL: {url}")
-        print(f"[+] Status Code: {response.status_code}")
-        print(f"[+] Server: {response.headers.get('Server', 'Unknown')}")
-        print(f"[+] Content-Type: {response.headers.get('Content-Type', 'Unknown')}")
+        response = requests.get(
+            url,
+            timeout=5,
+            allow_redirects=True
+        )
 
         return response
 
-    except requests.RequestException as error:
-        print(f"[-] HTTP request failed: {error}")
+    except requests.RequestException:
         return None
 
 
 def security_headers_check(response):
-    print("\n--- Security Headers ---")
+    headers = {}
 
     for header in SECURITY_HEADERS:
-        value = response.headers.get(header)
+        headers[header] = response.headers.get(header)
 
+    return headers
+
+
+def scan(domain):
+    result = {
+        "domain": domain,
+        "ip": None,
+        "url": None,
+        "status_code": None,
+        "server": None,
+        "content_type": None,
+        "security_headers": {}
+    }
+
+    # DNS
+    ip = dns_lookup(domain)
+    result["ip"] = ip
+
+    if not ip:
+        return result
+
+    # HTTP
+    response = http_check(domain)
+
+    if not response:
+        return result
+
+    result["url"] = response.url
+    result["status_code"] = response.status_code
+    result["server"] = response.headers.get("Server")
+    result["content_type"] = response.headers.get("Content-Type")
+    result["security_headers"] = security_headers_check(response)
+
+    return result
+
+
+def print_results(result):
+    print("\n=== Recon Tool ===")
+    print(f"Target: {result['domain']}")
+
+    print("\n--- DNS ---")
+    print(f"[+] IP: {result['ip']}")
+
+    print("\n--- HTTP ---")
+    print(f"[+] URL: {result['url']}")
+    print(f"[+] Status: {result['status_code']}")
+    print(f"[+] Server: {result['server']}")
+    print(f"[+] Content-Type: {result['content_type']}")
+
+    print("\n--- Security Headers ---")
+
+    for header, value in result["security_headers"].items():
         if value:
             print(f"[+] {header}: Present")
         else:
             print(f"[-] {header}: Missing")
+
+
+def save_json(result):
+    os.makedirs("reports", exist_ok=True)
+
+    filename = f"reports/{result['domain']}.json"
+
+    with open(filename, "w", encoding="utf-8") as file:
+        json.dump(result, file, indent=4)
+
+    print(f"\n[+] Report saved to: {filename}")
 
 
 def main():
@@ -62,24 +123,22 @@ def main():
         help="Domain to analyze"
     )
 
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Save results as JSON"
+    )
+
     args = parser.parse_args()
 
     domain = args.domain.strip()
 
-    print(f"\n=== Recon Tool ===")
-    print(f"Target: {domain}")
+    result = scan(domain)
 
-    print("\n--- DNS Lookup ---")
-    ip = dns_lookup(domain)
+    print_results(result)
 
-    if not ip:
-        return
-
-    print("\n--- HTTP Check ---")
-    response = http_check(domain)
-
-    if response:
-        security_headers_check(response)
+    if args.json:
+        save_json(result)
 
 
 if __name__ == "__main__":
