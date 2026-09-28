@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import os
 import socket
 
@@ -15,15 +16,34 @@ SECURITY_HEADERS = [
 ]
 
 
+# Create logs folder
+os.makedirs("logs", exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    filename="logs/recon.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+
 def dns_lookup(domain):
+    logging.info(f"Starting DNS lookup for {domain}")
+
     try:
-        return socket.gethostbyname(domain)
+        ip = socket.gethostbyname(domain)
+        logging.info(f"Resolved {domain} to {ip}")
+        return ip
+
     except socket.gaierror:
+        logging.error(f"Could not resolve {domain}")
         return None
 
 
 def http_check(domain):
     url = f"https://{domain}"
+
+    logging.info(f"Sending HTTPS request to {url}")
 
     try:
         response = requests.get(
@@ -32,9 +52,12 @@ def http_check(domain):
             allow_redirects=True
         )
 
+        logging.info(f"HTTP response: {response.status_code}")
+
         return response
 
-    except requests.RequestException:
+    except requests.RequestException as error:
+        logging.error(f"HTTP request failed: {error}")
         return None
 
 
@@ -48,6 +71,8 @@ def security_headers_check(response):
 
 
 def scan(domain):
+    logging.info(f"Starting scan for {domain}")
+
     result = {
         "domain": domain,
         "ip": None,
@@ -58,14 +83,12 @@ def scan(domain):
         "security_headers": {}
     }
 
-    # DNS
     ip = dns_lookup(domain)
     result["ip"] = ip
 
     if not ip:
         return result
 
-    # HTTP
     response = http_check(domain)
 
     if not response:
@@ -76,6 +99,8 @@ def scan(domain):
     result["server"] = response.headers.get("Server")
     result["content_type"] = response.headers.get("Content-Type")
     result["security_headers"] = security_headers_check(response)
+
+    logging.info(f"Scan completed for {domain}")
 
     return result
 
@@ -111,6 +136,8 @@ def save_json(result):
         json.dump(result, file, indent=4)
 
     print(f"\n[+] Report saved to: {filename}")
+
+    logging.info(f"JSON report saved to {filename}")
 
 
 def main():
