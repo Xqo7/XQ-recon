@@ -6,6 +6,20 @@ import socket
 
 import requests
 
+# =========================
+# COLORS
+# =========================
+
+RESET = "\033[0m"
+BOLD = "\033[1m"
+GREEN = "\033[92m"
+RED = "\033[91m"
+CYAN = "\033[96m"
+YELLOW = "\033[93m"
+BLUE = "\033[94m"
+
+from tech_detect import detect_technologies
+
 
 SECURITY_HEADERS = [
     "Content-Security-Policy",
@@ -52,7 +66,9 @@ def http_check(domain):
             allow_redirects=True
         )
 
-        logging.info(f"HTTP response: {response.status_code}")
+        logging.info(
+            f"HTTP response received: {response.status_code}"
+        )
 
         return response
 
@@ -80,51 +96,104 @@ def scan(domain):
         "status_code": None,
         "server": None,
         "content_type": None,
-        "security_headers": {}
+        "security_headers": {},
+        "technologies": []
     }
 
+    # DNS lookup
     ip = dns_lookup(domain)
     result["ip"] = ip
 
     if not ip:
         return result
 
+    # HTTP check
     response = http_check(domain)
 
     if not response:
         return result
 
+    # Basic HTTP information
     result["url"] = response.url
     result["status_code"] = response.status_code
     result["server"] = response.headers.get("Server")
     result["content_type"] = response.headers.get("Content-Type")
+
+    # Security headers
     result["security_headers"] = security_headers_check(response)
+
+    # Technology detection
+    result["technologies"] = detect_technologies(response)
 
     logging.info(f"Scan completed for {domain}")
 
     return result
 
+def print_banner():
+    print(f"""
+{CYAN}{BOLD}
+╔══════════════════════════════════════╗
+║        PYTHON CYBERSECURITY          ║
+║             RECON TOOL               ║
+╚══════════════════════════════════════╝
+{RESET}""")
 
 def print_results(result):
-    print("\n=== Recon Tool ===")
-    print(f"Target: {result['domain']}")
+    print_banner()
 
-    print("\n--- DNS ---")
-    print(f"[+] IP: {result['ip']}")
+    print(f"{BOLD}Target:{RESET} {result['domain']}")
 
-    print("\n--- HTTP ---")
-    print(f"[+] URL: {result['url']}")
-    print(f"[+] Status: {result['status_code']}")
-    print(f"[+] Server: {result['server']}")
-    print(f"[+] Content-Type: {result['content_type']}")
+    print(f"\n{CYAN}{BOLD}--- DNS ---{RESET}")
 
-    print("\n--- Security Headers ---")
+    if result["ip"]:
+        print(f"{GREEN}[+]{RESET} IP: {result['ip']}")
+    else:
+        print(f"{RED}[-]{RESET} DNS lookup failed")
+
+    print(f"\n{CYAN}{BOLD}--- HTTP ---{RESET}")
+
+    if result["url"]:
+        print(f"{GREEN}[+]{RESET} URL: {result['url']}")
+        print(f"{GREEN}[+]{RESET} Status: {result['status_code']}")
+        print(f"{GREEN}[+]{RESET} Server: {result['server']}")
+        print(f"{GREEN}[+]{RESET} Content-Type: {result['content_type']}")
+    else:
+        print(f"{RED}[-]{RESET} HTTP request failed")
+
+    print(f"\n{CYAN}{BOLD}--- Security Headers ---{RESET}")
 
     for header, value in result["security_headers"].items():
+
         if value:
-            print(f"[+] {header}: Present")
+            print(
+                f"{GREEN}[+]{RESET} "
+                f"{header}: {value}"
+            )
         else:
-            print(f"[-] {header}: Missing")
+            print(
+                f"{RED}[-]{RESET} "
+                f"{header}: Missing"
+            )
+
+    print(f"\n{CYAN}{BOLD}--- Technologies ---{RESET}")
+
+    if result["technologies"]:
+
+        for technology in result["technologies"]:
+            print(
+                f"{GREEN}[+]{RESET} "
+                f"{technology}"
+            )
+
+    else:
+        print(
+            f"{YELLOW}[!]{RESET} "
+            "No technologies detected"
+        )
+
+    print(f"\n{CYAN}{BOLD}=============================={RESET}")
+    print(f"{GREEN}{BOLD}Scan completed successfully.{RESET}")
+    print(f"{CYAN}{BOLD}=============================={RESET}\n")
 
 
 def save_json(result):
@@ -139,33 +208,140 @@ def save_json(result):
 
     logging.info(f"JSON report saved to {filename}")
 
-
 def main():
     parser = argparse.ArgumentParser(
-        description="Simple Python reconnaissance tool"
+        description="Python Cybersecurity Recon Tool"
     )
 
-    parser.add_argument(
+    subparsers = parser.add_subparsers(
+        dest="command",
+        required=True
+    )
+
+    # =========================
+    # SCAN COMMAND
+    # =========================
+
+    scan_parser = subparsers.add_parser(
+        "scan",
+        help="Run a full reconnaissance scan"
+    )
+
+    scan_parser.add_argument(
         "domain",
         help="Domain to analyze"
     )
 
-    parser.add_argument(
+    scan_parser.add_argument(
         "--json",
         action="store_true",
         help="Save results as JSON"
     )
 
+    # =========================
+    # DNS COMMAND
+    # =========================
+
+    dns_parser = subparsers.add_parser(
+        "dns",
+        help="Resolve a domain to an IP address"
+    )
+
+    dns_parser.add_argument(
+        "domain",
+        help="Domain to resolve"
+    )
+
+    # =========================
+    # HEADERS COMMAND
+    # =========================
+
+    headers_parser = subparsers.add_parser(
+        "headers",
+        help="Check security headers"
+    )
+
+    headers_parser.add_argument(
+        "domain",
+        help="Domain to check"
+    )
+
+    headers_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Save headers as JSON"
+    )
+
+    # =========================
+    # PARSE ARGUMENTS
+    # =========================
+
     args = parser.parse_args()
 
-    domain = args.domain.strip()
+    # =========================
+    # SCAN
+    # =========================
 
-    result = scan(domain)
+    if args.command == "scan":
 
-    print_results(result)
+        domain = args.domain.strip()
 
-    if args.json:
-        save_json(result)
+        result = scan(domain)
+
+        print_results(result)
+
+        if args.json:
+            save_json(result)
+
+    # =========================
+    # DNS
+    # =========================
+
+    elif args.command == "dns":
+
+        domain = args.domain.strip()
+
+        ip = dns_lookup(domain)
+
+        if ip:
+            print(f"\n[+] {domain} -> {ip}")
+        else:
+            print("[-] DNS lookup failed")
+
+    # =========================
+    # SECURITY HEADERS
+    # =========================
+
+    elif args.command == "headers":
+
+        domain = args.domain.strip()
+
+        response = http_check(domain)
+
+        if not response:
+            print("[-] HTTP request failed")
+            return
+
+        headers = security_headers_check(response)
+
+        print("\n=== Security Headers ===")
+        print(f"Target: {domain}\n")
+
+        for header, value in headers.items():
+
+            if value:
+                print(f"[+] {header}: {value}")
+            else:
+                print(f"[-] {header}: Missing")
+
+        if args.json:
+
+            result = {
+                "domain": domain,
+                "security_headers": headers
+            }
+
+            save_json(result)
 
 
 if __name__ == "__main__":
