@@ -3,9 +3,10 @@ import argparse
 from recon.dns import dns_lookup
 from recon.http import http_check
 from recon.output import print_results
-from recon.report import save_json
+from recon.report import save_json, save_subdomain_json
 from recon.scanner import scan
 from recon.security import security_headers_check
+from recon.subdomains import discover_subdomains
 
 from recon.validation import validate_domain
 
@@ -43,6 +44,30 @@ def main():
         "headers",
         help="Check HTTP security headers"
     )
+    subdomains_parser = subparsers.add_parser(
+        "subdomains",
+        help="Discover subdomains using a wordlists"
+    )
+
+    subdomains_parser.add_argument("domain")
+    subdomains_parser.add_argument(
+        "--wordlists",
+        default="wordlists/common.txt",
+        help="Path to subdomain wordlists"
+    )
+    subdomains_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Save results as JSON"
+    )
+    subdomains_parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        choices=range(1, 9),
+        metavar="{1-8}",
+        help="Number of concurrent DNS workers (1-8)"
+    )
     headers_parser.add_argument("domain")
     headers_parser.add_argument(
         "--json",
@@ -55,6 +80,34 @@ def main():
         parser.error(
             f"Invalid domain: {args.domain}"
         )
+    if args.command == "subdomains":
+        try:
+            with open(args.wordlists, "r", encoding="utf-8") as file:
+                wordlist = file.readlines()
+        except FileNotFoundError:
+            parser.error(f"Wordlists not found: {args.wordlist}")
+
+        results = discover_subdomains(
+            args.domain,
+            wordlist,
+        max_workers=args.workers
+        )
+
+        print(f"\nSubdomains found: {len(results)}")
+
+        for item in results:
+            print(
+                f"[+] {item['subdomain']} -> {item['ip']}"
+            )
+        if args.json:
+            filename = save_subdomain_json(
+                args.domain,
+                results
+            )
+
+            print(f"\nJSON report saved to: {filename}")
+        return
+
     if args.command == "scan":
         result = scan(args.domain)
         print_results(result)
