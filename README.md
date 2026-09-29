@@ -1,47 +1,102 @@
 # Python Recon Tool
 
-A simple Python reconnaissance tool for learning cybersecurity and network programming.
+A modular Python reconnaissance tool built for cybersecurity education
+and authorized security testing.
 
 ## Features
 
 - DNS lookup
-- IP address resolution
-- HTTPS request
-- HTTP status code
-- Server detection
-- Content-Type detection
-- Security headers check
+- HTTP metadata collection
+- Security header checks
+- Basic technology detection
+- Domain validation
+- Subdomain discovery
+- Bounded concurrent DNS discovery
+- TCP port discovery
+- Port validation
+- Common service identification
 - JSON reports
-- Command-line arguments
+- HTML port reports
+- CLI interface
+- Automated tests
 
-## Requirements
+## Project Structure
 
+```text
+pythonProject/
+├── main.py
+├── recon/
+│   ├── config.py
+│   ├── dns.py
+│   ├── http.py
+│   ├── security.py
+│   ├── tech.py
+│   ├── scanner.py
+│   ├── subdomains.py
+│   ├── ports.py
+│   ├── validation.py
+│   ├── output.py
+│   └── report.py
+├── tests/
+├── wordlists/
+│   └── common.txt
+├── reports/
+├── logs/
+├── requirements.txt
+└── README.md
+
+Requirements
 - Python 3.14+
 - requests
+- beautifulsoup4
+- dnspython
+- pytest
+Installation
+Create and activate a virtual environment, then install dependencies:
 
-## Installation
-
-Clone the repository:
-
-```bash
-git clone <YOUR_REPOSITORY_URL>
-cd pythonProject
-
-Create a virtual environment:
-python3 -m venv .venv
-
-Activate it:
-source .venv/bin/activate
-
-install dependencies:
-python -m pip install -r requirements.txt
+pip install -r requirements.txt
 
 Usage
-Basic scan:
-python recon.py example.com
+Full scan
 
-Save results as JSON:
-python recon.py example.com --json
+python main.py scan example.com
 
+DNS lookup
+
+python main.py dns example.com
+
+Security headers
+
+python main.py headers example.com
+
+Subdomain discovery
+
+python main.py subdomains example.com
+
+Subdomain discovery with workers
+
+python main.py subdomains example.com --workers 4
+
+Port discovery
+Use only against systems you own or are explicitly authorized to test.
+
+python main.py ports 127.0.0.1 --ports 22 80 443
+
+JSON output
+
+python main.py ports 127.0.0.1 --ports 22 80 443 --json
+
+Reports are saved under:
+
+reports/
+
+Testing
+Run the complete test suite:
+python -m pytest
+
+Version
+12.0.0
 Disclaimer
-This project is intended for educational purposes and authorized security testing only.
+This project is intended for cybersecurity education,
+lab environments, and authorized security testing only.
+Do not scan systems without permission.

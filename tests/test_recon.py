@@ -94,7 +94,7 @@ def test_save_json_structure(tmp_path, monkeypatch):
         report = json.load(file)
 
     assert report["tool"]["name"] == "Python Recon Tool"
-    assert report["tool"]["version"] == "10.0.0"
+    assert report["tool"]["version"] == "12.0.0"
     assert report["scan"]["target"] == "example.com"
     assert "timestamp" in report["scan"]
     assert report["data"]["status_code"] == 200

@@ -1,9 +1,15 @@
 import argparse
+from recon.ports import scan_ports
 
 from recon.dns import dns_lookup
 from recon.http import http_check
 from recon.output import print_results
-from recon.report import save_json, save_subdomain_json
+from recon.report import (
+    save_json,
+    save_subdomain_json,
+    save_port_json,
+    save_html_report,
+)
 from recon.scanner import scan
 from recon.security import security_headers_check
 from recon.subdomains import discover_subdomains
@@ -55,6 +61,26 @@ def main():
         default="wordlists/common.txt",
         help="Path to subdomain wordlists"
     )
+    ports_parser = subparsers.add_parser(
+        "ports",
+        help="Scan a limited list of TCP ports"
+    )
+
+    ports_parser.add_argument("host")
+
+    ports_parser.add_argument(
+        "--ports",
+        nargs="+",
+        type=int,
+        default=[21, 22, 25, 53, 80, 443, 8080],
+        help="TCP ports to check"
+    )
+
+    ports_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Save results as JSON"
+    )
     subdomains_parser.add_argument(
         "--json",
         action="store_true",
@@ -76,10 +102,11 @@ def main():
     )
 
     args = parser.parse_args()
-    if not validate_domain(args.domain):
-        parser.error(
-            f"Invalid domain: {args.domain}"
-        )
+    if args.command in {"scan", "dns", "headers", "subdomains"}:
+        if not validate_domain(args.domain):
+            parser.error(
+                f"Invalid domain: {args.domain}"
+            )
     if args.command == "subdomains":
         try:
             with open(args.wordlists, "r", encoding="utf-8") as file:
@@ -107,7 +134,40 @@ def main():
 
             print(f"\nJSON report saved to: {filename}")
         return
+    if args.command == "ports":
+        results = scan_ports(
+            args.host,
+            args.ports
+        )
 
+        print(f"\nPort scan: {args.host}")
+
+        for result in results:
+            status = "OPEN" if result["open"] else "CLOSED"
+
+            print(
+                f"{result['port']}/tcp - {status}"
+            )
+
+        if args.json:
+            filename = save_port_json(
+                args.host,
+                results
+            )
+
+            print(
+                f"\nJSON report saved to: {filename}"
+            )
+            html_filename = save_html_report(
+                args.host,
+                results
+            )
+
+            print(
+                f"HTML report saved to: {html_filename}"
+            )
+
+        return
     if args.command == "scan":
         result = scan(args.domain)
         print_results(result)
